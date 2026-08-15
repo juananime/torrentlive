@@ -14,7 +14,8 @@
     "dist": "npm run build && electron-builder --mac --arm64",
     "dist:universal": "npm run build && electron-builder --mac --universal",
     "check:native": "node scripts/check-native.mjs",
-    "smoke": "npm run build && WTLIVE_SMOKE=1 electron ."
+    "smoke": "npm run build && WTLIVE_SMOKE=1 electron .",
+    "test:ops": "ELECTRON_RUN_AS_NODE=1 electron scripts/test-ops.mjs"
   },
   "dependencies": {
     "webtorrent": "^3.0.21"

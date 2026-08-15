@@ -37,10 +37,27 @@ Other scripts:
 
 ```bash
 npm start          # production build, then launch
+npm run test:ops   # torrent ops + streaming regression tests (no network)
 npm run smoke      # headless self-test: boots the app and asserts it rendered
 npm run check:native   # audits the dependency tree for x86_64 addons
 npm run dist       # build a signed-less arm64 .dmg into release/
 ```
+
+### Demo mode
+
+An empty client shows nothing of the layout, so `WTLIVE_DEMO=1` replaces the
+session with sample data for UI work:
+
+```bash
+WTLIVE_DEMO=1 npm start
+
+# and to capture screenshots of it:
+WTLIVE_DEMO=1 WTLIVE_SHOT=/tmp/shots npm start
+```
+
+It swaps the entire state payload instead of injecting into the real client, so
+sample numbers can never mix into a genuine session. Preview playback shows a
+placeholder in this mode — there is no real data behind the sample entries.
 
 ---
 
@@ -87,10 +104,20 @@ silently needs Rosetta.
 ## Architecture
 
 ```
-electron/main.js      WebTorrent client, IPC handlers, loopback stream server
-electron/preload.cjs  contextBridge API (sandboxed, CommonJS by necessity)
-src/                  React 19 renderer — pure UI, no torrent logic
+electron/main.js           WebTorrent client, IPC handlers, window
+electron/stream-server.js  loopback HTTP range server for playback
+electron/demo-state.js     sample data for UI work (WTLIVE_DEMO only)
+electron/preload.cjs       contextBridge API (sandboxed, CommonJS by necessity)
+src/                       React 19 renderer — pure UI, no torrent logic
 ```
+
+> **`client.get()` is async in WebTorrent 3.** It runs the id through
+> `parseTorrent` and returns a *Promise*, so using it as though it returned a
+> torrent yields `undefined` for `.files`, `.destroy`, `.pause` — breaking
+> remove, pause, resume, reveal and streaming all at once, with the only
+> symptom being `t.destroy is not a function`. `main.js` therefore uses a
+> synchronous `findTorrent()` that scans `client.torrents`. `npm run test:ops`
+> locks this behaviour down.
 
 **WebTorrent runs in the main process, not the renderer.** That is a deliberate
 choice: the main process can open raw TCP sockets and speak DHT, so the client

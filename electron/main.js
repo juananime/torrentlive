@@ -1,12 +1,21 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import http from 'node:http'
 import fs from 'node:fs'
 import os from 'node:os'
+import { createStreamServer, mimeFor } from './stream-server.js'
+import { demoState, demoArtwork } from './demo-state.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DEV_URL = process.env.VITE_DEV_SERVER_URL
+
+/**
+ * UI-only preview mode (WTLIVE_DEMO=1). Replaces the real session with sample
+ * data so the layout can be reviewed without a live swarm. Off by default, and
+ * it swaps the whole state payload rather than injecting into the real client,
+ * so fabricated numbers can never mix into a genuine session.
+ */
+const DEMO = !!process.env.WTLIVE_DEMO
 
 // WebTorrent 3 is ESM-only and pure JS in the parts we rely on, so it is
 // imported lazily once the app is ready rather than at module scope.
@@ -19,95 +28,34 @@ let downloadPath = path.join(app.getPath('downloads'), 'WebTorrent Live')
 
 // ---------------------------------------------------------------------------
 // Streaming server
-//
-// The renderer is a sandboxed browser context, so it cannot read from a
-// torrent's chunk store directly. Instead the main process exposes each file
-// over loopback HTTP with byte-range support, which is exactly what a <video>
-// element needs in order to seek through a file that is still downloading.
 // ---------------------------------------------------------------------------
 
-const MIME = {
-  '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.mov': 'video/quicktime',
-  '.mkv': 'video/x-matroska', '.webm': 'video/webm', '.avi': 'video/x-msvideo',
-  '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.flac': 'audio/flac',
-  '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.opus': 'audio/ogg',
-  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
-  '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
-  '.pdf': 'application/pdf', '.txt': 'text/plain', '.srt': 'text/plain',
-  '.vtt': 'text/vtt'
+/**
+ * Look up a torrent by infohash.
+ *
+ * Deliberately NOT client.get(): that method is async in WebTorrent 3 (it runs
+ * the id through parseTorrent), so it hands back a Promise. Treating that
+ * Promise as a torrent silently yields undefined for .files/.destroy/.pause,
+ * which is exactly how remove/pause/resume/streaming all broke at once.
+ * Scanning client.torrents is synchronous and the array is tiny — which
+ * matters because the stream server calls this on every HTTP range request.
+ */
+function findTorrent (infoHash) {
+  if (!client || typeof infoHash !== 'string') return null
+  const want = infoHash.toLowerCase()
+  return client.torrents.find(t => t.infoHash === want) || null
 }
 
-const mimeFor = name => MIME[path.extname(name).toLowerCase()] || 'application/octet-stream'
-
 let streamPort = 0
+let stream = null
 
-function startStreamServer () {
-  return new Promise((resolve, reject) => {
-    const server = http.createServer((req, res) => {
-      // /stream/<infoHash>/<fileIndex>
-      const match = /^\/stream\/([a-f0-9]{40})\/(\d+)/i.exec(req.url || '')
-      if (!match) {
-        res.writeHead(404).end('not found')
-        return
-      }
-
-      const torrent = client?.get(match[1].toLowerCase())
-      const file = torrent?.files?.[Number(match[2])]
-      if (!file) {
-        res.writeHead(404).end('no such file')
-        return
-      }
-
-      const total = file.length
-      const range = req.headers.range
-      const headers = {
-        'Content-Type': mimeFor(file.name),
-        'Accept-Ranges': 'bytes',
-        // Streaming a partially-downloaded file must never be cached.
-        'Cache-Control': 'no-store'
-      }
-
-      let start = 0
-      let end = total - 1
-      let status = 200
-
-      if (range) {
-        const m = /bytes=(\d*)-(\d*)/.exec(range)
-        if (m) {
-          if (m[1]) start = parseInt(m[1], 10)
-          if (m[2]) end = parseInt(m[2], 10)
-          if (Number.isNaN(start) || Number.isNaN(end) || start > end || start >= total) {
-            res.writeHead(416, { 'Content-Range': `bytes */${total}` }).end()
-            return
-          }
-          status = 206
-          headers['Content-Range'] = `bytes ${start}-${end}/${total}`
-        }
-      }
-
-      headers['Content-Length'] = end - start + 1
-      res.writeHead(status, headers)
-
-      if (req.method === 'HEAD') {
-        res.end()
-        return
-      }
-
-      // Selecting the range tells WebTorrent to prioritise these pieces, so
-      // seeking ahead in a video pulls the needed pieces first.
-      const stream = file.createReadStream({ start, end })
-      stream.on('error', () => res.destroy())
-      res.on('close', () => stream.destroy())
-      stream.pipe(res)
-    })
-
-    server.on('error', reject)
-    // Loopback only — never expose torrent contents to the network.
-    server.listen(0, '127.0.0.1', () => {
-      streamPort = server.address().port
-      resolve(streamPort)
-    })
+async function startStreamServer () {
+  stream = createStreamServer({
+    findTorrent,
+    artworkFor: DEMO ? demoArtwork : null
   })
+  streamPort = await stream.listen()
+  return streamPort
 }
 
 // ---------------------------------------------------------------------------
@@ -149,7 +97,14 @@ function serialize (t) {
 }
 
 function pushState () {
-  if (!win || win.isDestroyed() || !client) return
+  if (!win || win.isDestroyed()) return
+
+  if (DEMO) {
+    win.webContents.send('torrents:state', demoState(streamPort))
+    return
+  }
+
+  if (!client) return
   win.webContents.send('torrents:state', {
     torrents: client.torrents.map(serialize),
     totals: {
@@ -216,6 +171,46 @@ function createWindow () {
   }
 
   if (process.env.WTLIVE_SMOKE) runSmokeTest()
+  if (process.env.WTLIVE_SHOT) runCapture(process.env.WTLIVE_SHOT)
+}
+
+/**
+ * Screenshots the running UI (WTLIVE_SHOT=<dir>), driving it through a couple
+ * of states first. capturePage() is used rather than an OS screen grab so this
+ * works without screen-recording permission and captures the window exactly.
+ */
+function runCapture (dir) {
+  const shot = async name => {
+    const img = await win.webContents.capturePage()
+    fs.mkdirSync(dir, { recursive: true })
+    const file = path.join(dir, `${name}.png`)
+    fs.writeFileSync(file, img.toPNG())
+    console.log('shot:', file)
+  }
+
+  const click = sel => win.webContents.executeJavaScript(
+    `(() => { const el = document.querySelector(${JSON.stringify(sel)});
+              if (!el) return 'NOT_FOUND'; el.click(); return 'OK' })()`
+  )
+
+  win.webContents.once('did-finish-load', async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms))
+    await wait(2000) // let React mount and the first state tick land
+
+    await shot('01-session')
+
+    // Open the preview pane on the first streamable file.
+    console.log('click video file →', await click('.frow'))
+    await wait(1200)
+    await shot('02-player')
+
+    // Show a filtered view.
+    console.log('click filter →', await click('.browser-item:nth-child(3)'))
+    await wait(700)
+    await shot('03-filtered')
+
+    app.exit(0)
+  })
 }
 
 /**
@@ -312,7 +307,7 @@ function registerIpc () {
   })
 
   ipcMain.handle('torrent:pause', (_e, infoHash) => {
-    const t = client.get(infoHash)
+    const t = findTorrent(infoHash)
     if (!t) return false
     // pause() halts peer traffic but keeps the torrent in the session.
     t.pause()
@@ -321,7 +316,7 @@ function registerIpc () {
   })
 
   ipcMain.handle('torrent:resume', (_e, infoHash) => {
-    const t = client.get(infoHash)
+    const t = findTorrent(infoHash)
     if (!t) return false
     t.resume()
     pushState()
@@ -329,15 +324,26 @@ function registerIpc () {
   })
 
   ipcMain.handle('torrent:remove', async (_e, { infoHash, deleteFiles } = {}) => {
-    const t = client.get(infoHash)
+    const t = findTorrent(infoHash)
     if (!t) return false
-    await new Promise(res => t.destroy({ destroyStore: !!deleteFiles }, res))
+
+    // torrent._destroy() returns early without invoking the callback when the
+    // torrent is already destroyed, so awaiting it a second time would hang
+    // the renderer forever. Double-clicking remove is enough to hit this.
+    if (t.destroyed) {
+      pushState()
+      return true
+    }
+
+    await new Promise((resolve, reject) => {
+      t.destroy({ destroyStore: !!deleteFiles }, err => (err ? reject(err) : resolve()))
+    })
     pushState()
     return true
   })
 
   ipcMain.handle('torrent:reveal', (_e, { infoHash, fileIndex }) => {
-    const t = client.get(infoHash)
+    const t = findTorrent(infoHash)
     if (!t) return false
     const file = typeof fileIndex === 'number' ? t.files[fileIndex] : null
     const target = file ? path.join(t.path, file.path) : t.path
