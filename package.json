@@ -1,0 +1,30 @@
+{
+  "name": "webtorrent-live",
+  "version": "0.1.0",
+  "description": "A WebTorrent desktop client with an Ableton Live inspired interface. Native Apple Silicon, no Rosetta required.",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.js",
+  "author": "Juan Antonio Jimenez Montes",
+  "license": "MIT",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "vite build",
+    "start": "npm run build && electron .",
+    "dist": "npm run build && electron-builder --mac --arm64",
+    "dist:universal": "npm run build && electron-builder --mac --universal",
+    "check:native": "node scripts/check-native.mjs",
+    "smoke": "npm run build && WTLIVE_SMOKE=1 electron ."
+  },
+  "dependencies": {
+    "webtorrent": "^3.0.21"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.5",
+    "electron": "^43.4.0",
+    "electron-builder": "^26.15.3",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "vite": "^8.2.1"
+  }
+}

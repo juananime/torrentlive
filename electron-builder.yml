@@ -1,0 +1,57 @@
+appId: com.jjm.webtorrent-live
+productName: WebTorrent Live
+copyright: MIT
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/**
+  - electron/**
+  - package.json
+  - '!**/*.map'
+
+# The Rosetta guarantee lives here.
+#
+# npmRebuild:false stops electron-builder from invoking node-gyp against the
+# dependency tree. Nothing in this app needs compiling: WebTorrent's native
+# extras (utp-native, bufferutil, utf-8-validate, node-datachannel) are all
+# optional accelerators with pure-JS fallbacks, and they are pruned below.
+# Without a compile step there is no chance of an x86_64 object being linked
+# into an arm64 app, which is the usual way a "native" build ends up needing
+# Rosetta.
+npmRebuild: false
+buildDependenciesFromSource: false
+
+asar: true
+asarUnpack:
+  - '**/*.node'
+
+mac:
+  category: public.app-category.utilities
+  # arm64 first: this is an Apple Silicon native app by design.
+  target:
+    - target: dmg
+      arch: [arm64]
+    - target: zip
+      arch: [arm64]
+  darkModeSupport: true
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  extendInfo:
+    # BitTorrent needs to accept inbound peer connections.
+    NSLocalNetworkUsageDescription: >-
+      WebTorrent Live connects to peers on your local network to download and
+      share torrents.
+
+dmg:
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
