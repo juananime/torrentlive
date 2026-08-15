@@ -1,5 +1,5 @@
-appId: com.jjm.webtorrent-live
-productName: WebTorrent Live
+appId: com.jjm.torrent-live
+productName: Torrent Live
 copyright: MIT
 
 directories:
@@ -29,6 +29,18 @@ asarUnpack:
   - '**/*.node'
 
 mac:
+  # Ship no x86_64 code at all. These prebuilds are inert on an arm64 app (the
+  # loader picks darwin-arm64), but excluding them means the bundle cannot
+  # contain a single Intel binary — the no-Rosetta promise, enforced by
+  # construction rather than by convention.
+  #
+  # Note: this deliberately breaks `dist:universal`. If a universal build is
+  # ever wanted, drop the darwin-x64 line — the modules are optional
+  # accelerators, so an Intel slice without them still runs, just without
+  # µTP and the native WebSocket helpers.
+  files:
+    - '!**/prebuilds/{linux,android,win32}-*'
+    - '!**/prebuilds/darwin-x64'
   category: public.app-category.utilities
   # arm64 first: this is an Apple Silicon native app by design.
   target:
@@ -44,7 +56,7 @@ mac:
   extendInfo:
     # BitTorrent needs to accept inbound peer connections.
     NSLocalNetworkUsageDescription: >-
-      WebTorrent Live connects to peers on your local network to download and
+      Torrent Live connects to peers on your local network to download and
       share torrents.
 
 dmg:
@@ -55,3 +67,27 @@ dmg:
       y: 220
       type: link
       path: /Applications
+
+win:
+  # Same idea on Windows: drop prebuilds for other operating systems. Both
+  # win32 architectures are kept because a single NSIS installer carries x64
+  # and arm64 payloads.
+  files:
+    - '!**/prebuilds/{linux,android,darwin}-*'
+  # x64 covers every current Intel/AMD PC; arm64 covers Snapdragon/Surface
+  # machines natively, which is the same no-emulation goal as Apple Silicon.
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
+
+nsis:
+  # A normal wizard rather than a silent one-click install, so the user picks
+  # the location and knows what landed on their machine.
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Torrent Live

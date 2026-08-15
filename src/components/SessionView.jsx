@@ -36,8 +36,8 @@ export default function SessionView ({ torrents, selected, onSelect, onPause, on
       <div className="session-body">
         {torrents.map(t => (
           <div
-            key={t.infoHash}
-            className={`trow${selected === t.infoHash ? ' selected' : ''}${t.paused ? ' paused' : ''}`}
+            key={t.id}
+            className={`trow${selected && selected === t.infoHash ? ' selected' : ''}${t.paused ? ' paused' : ''}`}
             onClick={() => onSelect(t.infoHash)}
             onDoubleClick={() => onReveal(t.infoHash)}
           >

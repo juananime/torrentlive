@@ -1,5 +1,5 @@
 {
-  "name": "webtorrent-live",
+  "name": "torrent-live",
   "version": "0.1.0",
   "description": "A WebTorrent desktop client with an Ableton Live inspired interface. Native Apple Silicon, no Rosetta required.",
   "private": true,
@@ -15,7 +15,11 @@
     "dist:universal": "npm run build && electron-builder --mac --universal",
     "check:native": "node scripts/check-native.mjs",
     "smoke": "npm run build && WTLIVE_SMOKE=1 electron .",
-    "test:ops": "ELECTRON_RUN_AS_NODE=1 electron scripts/test-ops.mjs"
+    "test:ops": "ELECTRON_RUN_AS_NODE=1 electron scripts/test-ops.mjs",
+    "smoke:dev": "WTLIVE_SMOKE=1 node scripts/dev.mjs",
+    "icon": "electron scripts/make-icon.mjs",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:all": "npm run build && electron-builder --mac --win"
   },
   "dependencies": {
     "webtorrent": "^3.0.21"

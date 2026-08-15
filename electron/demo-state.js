@@ -150,6 +150,7 @@ export function demoState (streamPort) {
     })
 
     return {
+      id: infoHash,
       infoHash,
       name: s.name,
       magnetURI: `magnet:?xt=urn:btih:${infoHash}`,
@@ -165,7 +166,7 @@ export function demoState (streamPort) {
       paused,
       done: progress >= 1,
       ready: true,
-      path: `/Users/you/Downloads/WebTorrent Live/${s.name}`,
+      path: `/Users/you/Downloads/Torrent Live/${s.name}`,
       files
     }
   })

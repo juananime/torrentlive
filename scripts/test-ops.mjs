@@ -66,6 +66,8 @@ const torrent = await new Promise(resolve =>
   client.seed(filePath, { announce: [] }, resolve)
 )
 const hash = torrent.infoHash
+// Keep the encoded .torrent so the "added from a file" path can be tested.
+const torrentFileBuf = Buffer.from(torrent.torrentFile)
 
 console.log('the bug that broke everything:')
 check('client.get() returns a Promise, not a torrent',
@@ -126,6 +128,38 @@ check('destroy() resolves', true)
 check('torrent leaves client.torrents', findTorrent(hash) === null)
 check('already-destroyed torrent is flagged (guards the hang)', t.destroyed === true)
 check('source file kept when destroyStore is false', fs.existsSync(filePath))
+
+console.log('\nreact key safety (torrent added from a .torrent file):')
+{
+  // Adding by file has to read and parse the file before the infoHash is
+  // known. During that window the renderer still receives the torrent, so
+  // keying rows on infoHash alone produced an undefined React key — which
+  // silently degrades reconciliation to index-based matching.
+  const torrentPath = path.join(tmp, 'sample.torrent')
+  fs.writeFileSync(torrentPath, torrentFileBuf)
+
+  const c2 = new WebTorrent({ dht: false, tracker: false, lsd: false })
+  const pending = c2.add(torrentPath, { path: tmp, announce: [] })
+
+  const idOf = (t, i) => t.infoHash || t.magnetURI || `pending-${i}`
+
+  check('infoHash really is undefined right after adding a file',
+    pending.infoHash == null, `got ${pending.infoHash}`)
+  check('id fallback still yields a usable React key',
+    typeof idOf(pending, 0) === 'string' && idOf(pending, 0).length > 0,
+    String(idOf(pending, 0)))
+
+  // Once metadata lands the id becomes the real infoHash and stays stable.
+  await new Promise(resolve => {
+    if (pending.infoHash) return resolve()
+    pending.once('infoHash', resolve)
+    setTimeout(resolve, 5000)
+  })
+  check('id becomes the infoHash once parsed', idOf(pending, 0) === hash,
+    `${idOf(pending, 0)} vs ${hash}`)
+
+  await new Promise(r => c2.destroy(r))
+}
 
 await stream.close()
 await new Promise(r => client.destroy(r))

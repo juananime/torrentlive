@@ -24,7 +24,7 @@ let client = null
 let win = null
 
 /** Where finished files land. Overridden per-torrent from the renderer. */
-let downloadPath = path.join(app.getPath('downloads'), 'WebTorrent Live')
+let downloadPath = path.join(app.getPath('downloads'), 'Torrent Live')
 
 // ---------------------------------------------------------------------------
 // Streaming server
@@ -63,10 +63,15 @@ async function startStreamServer () {
 // ---------------------------------------------------------------------------
 
 /** Structured-clone-safe snapshot of a torrent for the renderer. */
-function serialize (t) {
+function serialize (t, i = 0) {
   const done = t.progress >= 1
   return {
-    infoHash: t.infoHash,
+    // A torrent added from a .torrent file or URL has no infoHash until its
+    // metadata arrives, so infoHash alone is not safe as a React key — an
+    // undefined key silently degrades reconciliation to index-based matching.
+    // id is guaranteed present and stable for a given torrent.
+    id: t.infoHash || t.magnetURI || `pending-${i}`,
+    infoHash: t.infoHash || null,
     name: t.name || t.infoHash,
     magnetURI: t.magnetURI,
     length: t.length || 0,
@@ -106,7 +111,7 @@ function pushState () {
 
   if (!client) return
   win.webContents.send('torrents:state', {
-    torrents: client.torrents.map(serialize),
+    torrents: client.torrents.map((t, i) => serialize(t, i)),
     totals: {
       downloadSpeed: client.downloadSpeed || 0,
       uploadSpeed: client.uploadSpeed || 0,

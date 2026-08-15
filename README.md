@@ -1,4 +1,4 @@
-# WebTorrent Live
+# Torrent Live
 
 A WebTorrent desktop client for macOS with an interface modelled on **Ableton Live**.
 Built to run **natively on Apple Silicon with no Rosetta and no compile step**.
@@ -11,7 +11,7 @@ Live's session view is a dense grid of coloured clips with level meters, a brows
 down the left, and a detail panel across the bottom. That maps onto a torrent
 client almost one-for-one:
 
-| Ableton Live | WebTorrent Live |
+| Ableton Live | Torrent Live |
 | --- | --- |
 | Control bar (tempo, transport, CPU meter) | Magnet input, global ↓/↑ read-outs, peers, ratio |
 | Browser sidebar (Sounds, Drums, Packs) | Status filters — All / Downloading / Seeding / Paused |
@@ -40,8 +40,36 @@ npm start          # production build, then launch
 npm run test:ops   # torrent ops + streaming regression tests (no network)
 npm run smoke      # headless self-test: boots the app and asserts it rendered
 npm run check:native   # audits the dependency tree for x86_64 addons
-npm run dist       # build a signed-less arm64 .dmg into release/
+npm run icon       # regenerate build/icon.png
 ```
+
+---
+
+## Installers
+
+```bash
+npm run dist       # macOS  → .dmg + .zip (arm64)
+npm run dist:win   # Windows → NSIS installer + .zip (x64 and arm64)
+npm run dist:all   # both
+```
+
+Everything lands in `release/`:
+
+| File | Platform |
+| --- | --- |
+| `Torrent Live-0.1.0-arm64.dmg` | macOS, Apple Silicon |
+| `Torrent Live Setup 0.1.0.exe` | Windows installer, x64 + arm64 in one |
+| `Torrent Live-0.1.0-win.zip` | Windows x64, portable |
+| `Torrent Live-0.1.0-arm64-win.zip` | Windows arm64, portable |
+
+Both platforms cross-build from a Mac — the Windows installer needs no Wine,
+because nothing in the tree is compiled (see below).
+
+**Signing.** The macOS build is signed with whatever local Developer identity
+is available but is *not* notarised, so on another machine Gatekeeper will
+need right-click → Open the first time. The Windows binaries are unsigned;
+SmartScreen will warn until they are signed with a code-signing certificate.
+Neither affects the app, only the first-run prompt.
 
 ### Demo mode
 
@@ -97,7 +125,24 @@ ships a prebuilt `darwin-arm64` binary — verified by `npm run check:native`:
 `electron-builder.yml` sets `npmRebuild: false`, so packaging never invokes
 node-gyp. No compiler, no Xcode toolchain, no chance of an x86_64 object being
 linked into an arm64 app — which is the usual route to a "native" build that
-silently needs Rosetta.
+silently needs Rosetta. It is also why Windows installers cross-build from a
+Mac without Wine.
+
+**3. The shipped bundle contains no Intel code at all.** The `mac.files` rules
+exclude every non-arm64 prebuild, so the promise holds by construction rather
+than by convention. Verifiable on the built app:
+
+```console
+$ find "release/mac-arm64/Torrent Live.app" -name '*.node' -exec file {} \;
+… utp-native/prebuilds/darwin-arm64/node.napi.node:        Mach-O 64-bit bundle arm64
+… fs-native-extensions/prebuilds/darwin-arm64/…:           Mach-O … arm64
+… node-datachannel/build/Release/node_datachannel.node:    Mach-O … arm64
+… utf-8-validate/prebuilds/darwin-arm64/…:                 Mach-O 64-bit bundle arm64
+… bufferutil/prebuilds/darwin-arm64/…:                     Mach-O 64-bit bundle arm64
+
+$ lipo -archs "release/mac-arm64/Torrent Live.app/Contents/MacOS/Torrent Live"
+arm64
+```
 
 ---
 
