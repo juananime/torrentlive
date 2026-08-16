@@ -42,6 +42,12 @@ export default function App () {
     if (!selected && torrents.length) setSelected(torrents[0].infoHash)
   }, [torrents, selected])
 
+  // Main only serialises the file list of the selected torrent, so it needs to
+  // know what is selected.
+  useEffect(() => {
+    window.wt.focus(selected ?? null).catch(() => {})
+  }, [selected])
+
   const counts = useMemo(() => ({
     all: torrents.length,
     downloading: torrents.filter(t => !t.done && !t.paused).length,

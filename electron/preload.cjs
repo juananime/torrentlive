@@ -14,6 +14,12 @@ contextBridge.exposeInMainWorld('wt', {
     try { return webUtils.getPathForFile(file) } catch { return null }
   },
 
+  /** Tells main which torrent is selected, so only its files are serialised. */
+  focus: infoHash => ipcRenderer.invoke('ui:focus', infoHash),
+
+  /** Records a renderer-side failure into the app's crash log. */
+  reportError: message => ipcRenderer.invoke('ui:error', String(message)),
+
   add: (source, savePath) => ipcRenderer.invoke('torrent:add', { source, savePath }),
   addFile: () => ipcRenderer.invoke('torrent:addFile'),
   pause: infoHash => ipcRenderer.invoke('torrent:pause', infoHash),

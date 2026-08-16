@@ -38,13 +38,18 @@ const CLIPS = [
   'var(--clip-5)', 'var(--clip-6)', 'var(--clip-7)', 'var(--clip-8)'
 ]
 
-export function clipColor (infoHash = '') {
+export function clipColor (infoHash) {
+  // Coerced rather than defaulted: a torrent has no infoHash until its
+  // metadata is parsed, and serialize() sends null for that state. A default
+  // parameter only covers undefined, so null would still throw here.
+  const s = infoHash == null ? '' : String(infoHash)
   let h = 0
-  for (let i = 0; i < infoHash.length; i++) h = (h * 31 + infoHash.charCodeAt(i)) >>> 0
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
   return CLIPS[h % CLIPS.length]
 }
 
-export function kindOf (mime = '') {
+export function kindOf (mime) {
+  mime = mime == null ? '' : String(mime)
   if (mime.startsWith('video/')) return 'vid'
   if (mime.startsWith('audio/')) return 'aud'
   if (mime.startsWith('image/')) return 'img'
@@ -54,7 +59,7 @@ export function kindOf (mime = '') {
 }
 
 /** Accepts a magnet URI or a bare 40-char infohash. */
-export function looksLikeTorrentSource (s = '') {
-  const v = s.trim()
+export function looksLikeTorrentSource (s) {
+  const v = (s == null ? '' : String(s)).trim()
   return /^magnet:\?/i.test(v) || /^[a-f0-9]{40}$/i.test(v) || /^https?:\/\/.+\.torrent/i.test(v)
 }

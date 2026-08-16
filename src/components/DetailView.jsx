@@ -28,7 +28,7 @@ export default function DetailView ({
         </span>
         {torrent && (
           <span className="label mono">
-            {torrent.files.length} files · {bytes(torrent.length)} · {pct(torrent.progress)}
+            {torrent.fileCount ?? torrent.files.length} files · {bytes(torrent.length)} · {pct(torrent.progress)}
           </span>
         )}
         <span className="spacer" />
@@ -48,7 +48,11 @@ export default function DetailView ({
 
           {torrent && !torrent.files.length && (
             <div className="empty" style={{ padding: '34px 20px' }}>
-              <p>Waiting for metadata from peers…</p>
+              <p>
+                {torrent.filesTruncated
+                  ? 'Loading file list…'
+                  : 'Waiting for metadata from peers…'}
+              </p>
             </div>
           )}
 

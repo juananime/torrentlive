@@ -62,8 +62,26 @@ async function startStreamServer () {
 // Torrent state serialisation
 // ---------------------------------------------------------------------------
 
+/**
+ * Which torrent the UI currently has selected. Only that torrent's file list
+ * is sent in full — see serialize().
+ */
+let focusedHash = null
+
+/** Below this, a file list is cheap enough to send for every torrent. */
+const ALWAYS_SEND_FILES_UNDER = 40
+
 /** Structured-clone-safe snapshot of a torrent for the renderer. */
 function serialize (t, i = 0) {
+  // The state tick runs twice a second. Serialising every file of every
+  // torrent means a release with a few thousand files produces a multi-megabyte
+  // structured clone 2x/sec, which is enough to peg the renderer and leave the
+  // window unpainted. Only the selected torrent needs its files listed; the
+  // rest only need a count.
+  const fileCount = t.files?.length || 0
+  const withFiles = fileCount <= ALWAYS_SEND_FILES_UNDER ||
+                    (t.infoHash && t.infoHash === focusedHash)
+
   const done = t.progress >= 1
   return {
     // A torrent added from a .torrent file or URL has no infoHash until its
@@ -87,7 +105,9 @@ function serialize (t, i = 0) {
     done,
     ready: !!t.ready,
     path: t.path,
-    files: (t.files || []).map((f, i) => ({
+    fileCount,
+    filesTruncated: !withFiles,
+    files: (withFiles ? (t.files || []) : []).map((f, i) => ({
       index: i,
       name: f.name,
       path: f.path,
@@ -137,6 +157,22 @@ function wireTorrent (t) {
 }
 
 // ---------------------------------------------------------------------------
+// Crash logging
+// ---------------------------------------------------------------------------
+
+const crashLogPath = () => path.join(app.getPath('userData'), 'crash.log')
+
+/** Appends a line to a log the user can retrieve after a failure. */
+function logCrash (message) {
+  const line = `[${new Date().toISOString()}] ${message}\n`
+  try {
+    fs.mkdirSync(path.dirname(crashLogPath()), { recursive: true })
+    fs.appendFileSync(crashLogPath(), line)
+  } catch { /* logging must never itself throw */ }
+  console.error(line.trim())
+}
+
+// ---------------------------------------------------------------------------
 // Window
 // ---------------------------------------------------------------------------
 
@@ -162,6 +198,26 @@ function createWindow () {
   })
 
   win.once('ready-to-show', () => win.show())
+
+  // A black window with no UI is either React unmounting after a render throw
+  // (the ErrorBoundary now catches that) or the renderer process actually
+  // dying. These handlers tell the two apart instead of leaving a blank frame,
+  // and write the reason to a log the user can send back.
+  win.webContents.on('render-process-gone', (_e, details) => {
+    logCrash(`renderer gone: ${details.reason} (exitCode ${details.exitCode})`)
+    if (details.reason !== 'clean-exit') {
+      dialog.showErrorBox(
+        'Torrent Live — display crashed',
+        `The window's renderer stopped: ${details.reason}.\n\n` +
+        'The torrent session is unaffected. A log was written to:\n' + crashLogPath()
+      )
+      win.webContents.reload()
+    }
+  })
+
+  win.webContents.on('unresponsive', () => {
+    logCrash('renderer unresponsive (busy or out of memory)')
+  })
 
   // External links open in the user's browser, never inside the app.
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -237,11 +293,33 @@ function runSmokeTest () {
     // Give React a beat to mount and the first IPC round-trip to land.
     await new Promise(r => setTimeout(r, 1500))
 
+    // WTLIVE_ADD=<magnet|path> exercises the render path for a real torrent.
+    // A torrent added from a .torrent file has no infoHash until it is parsed,
+    // and that state once crashed the renderer — hence asserting it here.
+    if (process.env.WTLIVE_ADD) {
+      try {
+        fs.mkdirSync(downloadPath, { recursive: true })
+        const t = client.add(process.env.WTLIVE_ADD, { path: downloadPath })
+        wireTorrent(t)
+        console.log('added torrent, infoHash at add time:', String(t.infoHash))
+        // Magnets need time for metadata to arrive from peers; a .torrent file
+        // is parsed locally and needs almost none.
+        await new Promise(r => setTimeout(r, Number(process.env.WTLIVE_WAIT || 2500)))
+        console.log('after wait: name=%s files=%d peers=%d',
+          t.name, t.files?.length ?? -1, t.numPeers)
+      } catch (err) {
+        console.log('add failed:', err.message)
+      }
+    }
+
     const probe = await win.webContents.executeJavaScript(`(() => ({
       rootChildren: document.getElementById('root').childElementCount,
       rows: document.querySelectorAll('.controlbar, .browser, .session, .detail').length,
       badge: document.querySelector('.archbadge b')?.textContent ?? null,
-      bridge: typeof window.wt
+      bridge: typeof window.wt,
+      torrentRows: document.querySelectorAll('.trow').length,
+      fileRows: document.querySelectorAll('.frow').length,
+      crashed: !!document.querySelector('.crash')
     }))()`).catch(e => ({ error: e.message }))
 
     console.log('\n--- SMOKE ---')
@@ -253,10 +331,17 @@ function runSmokeTest () {
     console.log('root mounted    :', probe.rootChildren > 0 ? 'yes' : 'NO')
     console.log('panels rendered :', probe.rows, '/ 4')
     console.log('arch badge      :', probe.badge)
+    if (process.env.WTLIVE_ADD) {
+      console.log('torrent rows    :', probe.torrentRows)
+      console.log('file rows       :', probe.fileRows)
+      console.log('crash screen    :', probe.crashed ? 'SHOWN — render threw' : 'no')
+    }
     console.log('console errors  :', errors.length ? errors : 'none')
 
     const ok = probe.bridge === 'object' && probe.rootChildren > 0 &&
-               probe.rows === 4 && errors.length === 0 && !!client && streamPort > 0
+               probe.rows === 4 && errors.length === 0 && !!client && streamPort > 0 &&
+               !probe.crashed &&
+               (!process.env.WTLIVE_ADD || probe.torrentRows > 0)
     console.log('RESULT          :', ok ? 'PASS' : 'FAIL')
     console.log('--- END ---\n')
     app.exit(ok ? 0 : 1)
@@ -309,6 +394,19 @@ function registerIpc () {
     }
     pushState()
     return { added: filePaths.length }
+  })
+
+  // The renderer tells us which torrent is selected so serialize() can send
+  // that one's file list and skip the rest.
+  ipcMain.handle('ui:error', (_e, message) => {
+    logCrash(`renderer error: ${message}`)
+    return true
+  })
+
+  ipcMain.handle('ui:focus', (_e, infoHash) => {
+    focusedHash = typeof infoHash === 'string' ? infoHash.toLowerCase() : null
+    pushState()
+    return true
   })
 
   ipcMain.handle('torrent:pause', (_e, infoHash) => {

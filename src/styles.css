@@ -517,3 +517,38 @@ body {
   color: var(--text-bright);
   line-height: 1.5;
 }
+
+/* ---- Crash fallback ------------------------------------------------------ */
+
+.crash {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-app);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px;
+  text-align: center;
+  z-index: 100;
+}
+.crash h3 {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--rec);
+  font-weight: 600;
+}
+.crash p { margin: 0; max-width: 460px; color: var(--text-dim); line-height: 1.7; }
+.crash .msg {
+  font-family: var(--mono);
+  color: var(--text-bright);
+  background: var(--bg-panel);
+  border: 1px solid var(--rec);
+  border-left-width: 3px;
+  padding: 8px 12px;
+  text-align: left;
+  word-break: break-word;
+}
