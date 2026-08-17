@@ -89,6 +89,52 @@ placeholder in this mode — there is no real data behind the sample entries.
 
 ---
 
+## Becoming the default torrent app
+
+Two independent registrations, both declared in `electron-builder.yml`:
+
+| What | Mechanism | Automatic? |
+| --- | --- | --- |
+| `magnet:` links | `protocols:` → `CFBundleURLTypes` + `app.setAsDefaultProtocolClient()` at startup | yes |
+| `.torrent` files | `fileAssociations:` → `CFBundleDocumentTypes` with `LSHandlerRank: Owner` | usually |
+
+Magnet links are claimed on every launch, so they work as soon as the app has
+run once. For `.torrent` files macOS decides via LaunchServices: with
+`LSHandlerRank: Owner` and no other torrent client installed it picks this app
+automatically, but if another client already owns the type the choice is the
+user's to make — right-click a `.torrent` → **Get Info** → **Open with** →
+Torrent Live → **Change All**. There is no API to force it; the sidebar shows
+the magnet status and spells out that manual step.
+
+The app must live in `/Applications` for LaunchServices to register it
+reliably.
+
+Handling them correctly needs more than the declarations:
+
+- `open-file` / `open-url` are registered **before** `app.whenReady()`, because
+  macOS fires them during launch. Sources arriving before the WebTorrent client
+  exists are queued and replayed once it is up — otherwise a cold-start open
+  silently does nothing.
+- A single-instance lock means double-clicking a second torrent hands off to the
+  running app instead of starting a rival client over the same files.
+- Windows passes both files and magnet URLs on the command line, so `process.argv`
+  is parsed on startup and on `second-instance`.
+
+## Folder permissions on macOS
+
+The app uses the hardened runtime but is **not** sandboxed, so macOS (TCC)
+asks once, on the first write into a protected folder — `~/Downloads` being the
+default save location. `Info.plist` carries explicit reasons
+(`NSDownloadsFolderUsageDescription` and friends) so that prompt explains
+itself instead of showing a generic warning.
+
+Picking a folder through **Change folder…** counts as user consent for that
+location, so ordinary use is a single prompt on first download. If it is ever
+denied by mistake, re-grant it under System Settings → Privacy & Security →
+Files and Folders.
+
+---
+
 ## The no-Rosetta guarantee
 
 Rosetta gets dragged into an Electron app in one of two ways: the Electron

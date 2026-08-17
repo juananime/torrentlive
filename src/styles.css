@@ -552,3 +552,24 @@ body {
   text-align: left;
   word-break: break-word;
 }
+
+/* ---- Default-handler status (browser footer) ----------------------------- */
+
+.defaults { display: grid; gap: 5px; margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--line); }
+.defaults-row { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text); }
+.defaults-row .dot {
+  width: 6px; height: 6px; flex: none;
+  background: var(--text-faint);
+  border: 1px solid var(--line-edge);
+}
+.defaults-row .dot.on { background: var(--meter-lo); border-color: var(--meter-lo); }
+.defaults-row b {
+  margin-left: auto;
+  font-size: 9px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--meter-lo);
+}
+.defaults-row .btn { margin-left: auto; height: 18px; font-size: 9px; }
+.defaults .hint { margin: 0; font-size: 9px; line-height: 1.5; color: var(--text-faint); }
+.defaults .hint code { font-family: var(--mono); color: var(--text-dim); }

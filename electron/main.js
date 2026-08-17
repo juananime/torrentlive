@@ -331,11 +331,9 @@ function runSmokeTest () {
     console.log('root mounted    :', probe.rootChildren > 0 ? 'yes' : 'NO')
     console.log('panels rendered :', probe.rows, '/ 4')
     console.log('arch badge      :', probe.badge)
-    if (process.env.WTLIVE_ADD) {
-      console.log('torrent rows    :', probe.torrentRows)
-      console.log('file rows       :', probe.fileRows)
-      console.log('crash screen    :', probe.crashed ? 'SHOWN — render threw' : 'no')
-    }
+    console.log('torrent rows    :', probe.torrentRows)
+    console.log('file rows       :', probe.fileRows)
+    console.log('crash screen    :', probe.crashed ? 'SHOWN — render threw' : 'no')
     console.log('console errors  :', errors.length ? errors : 'none')
 
     const ok = probe.bridge === 'object' && probe.rootChildren > 0 &&
@@ -398,6 +396,19 @@ function registerIpc () {
 
   // The renderer tells us which torrent is selected so serialize() can send
   // that one's file list and skip the rest.
+  ipcMain.handle('app:defaults', () => ({
+    magnet: app.isDefaultProtocolClient('magnet'),
+    // macOS exposes no API to force the default .torrent handler; that is a
+    // LaunchServices decision the user makes in Finder. Windows 10+ likewise
+    // requires the user to confirm in Settings.
+    torrentNeedsManualStep: process.platform === 'darwin'
+  }))
+
+  ipcMain.handle('app:setDefaults', () => {
+    app.setAsDefaultProtocolClient('magnet')
+    return { magnet: app.isDefaultProtocolClient('magnet') }
+  })
+
   ipcMain.handle('ui:error', (_e, message) => {
     logCrash(`renderer error: ${message}`)
     return true
@@ -486,6 +497,80 @@ function isTranslated () {
 }
 
 // ---------------------------------------------------------------------------
+// System integration: .torrent files and magnet: links
+// ---------------------------------------------------------------------------
+
+/**
+ * Sources handed to us by the OS before the client exists.
+ *
+ * Double-clicking a .torrent launches the app and fires open-file almost
+ * immediately — well before webtorrent has been imported — so these are
+ * queued and replayed once the client is up. Missing this is why a
+ * cold-start open silently does nothing.
+ */
+const pendingSources = []
+
+function handleSource (source) {
+  if (!source || typeof source !== 'string') return
+  if (!client) {
+    pendingSources.push(source)
+    return
+  }
+  try {
+    fs.mkdirSync(downloadPath, { recursive: true })
+    const existing = client.torrents.find(t => t.magnetURI === source)
+    if (!existing) {
+      const t = client.add(source, { path: downloadPath })
+      wireTorrent(t)
+    }
+    pushState()
+    if (win && !win.isDestroyed()) {
+      if (win.isMinimized()) win.restore()
+      win.focus()
+    }
+  } catch (err) {
+    logCrash(`failed to open ${source}: ${err.message}`)
+  }
+}
+
+function flushPendingSources () {
+  while (pendingSources.length) handleSource(pendingSources.shift())
+}
+
+/** Picks torrent sources out of a command line (how Windows delivers them). */
+function sourcesFromArgv (argv) {
+  return argv.slice(1).filter(a =>
+    a.startsWith('magnet:') || a.toLowerCase().endsWith('.torrent')
+  )
+}
+
+// Registered before ready on purpose — macOS fires these during launch.
+app.on('open-file', (event, filePath) => {
+  event.preventDefault()
+  handleSource(filePath)
+})
+
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  handleSource(url)
+})
+
+// A second launch (double-clicking another torrent) must hand off to the
+// running instance rather than starting a rival client on the same files.
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+if (!gotSingleInstanceLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (_e, argv) => {
+    for (const s of sourcesFromArgv(argv)) handleSource(s)
+    if (win && !win.isDestroyed()) {
+      if (win.isMinimized()) win.restore()
+      win.focus()
+    }
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
 
@@ -500,6 +585,16 @@ app.whenReady().then(async () => {
   await startStreamServer()
   registerIpc()
   createWindow()
+
+  // Claims the magnet: scheme at runtime. The Info.plist entry is what makes
+  // the app appear in the "Open with" list; this makes it the active handler
+  // without the user digging through System Settings.
+  app.setAsDefaultProtocolClient('magnet')
+
+  // Anything the OS handed us during launch, plus (on Windows) sources passed
+  // on the command line.
+  for (const s of sourcesFromArgv(process.argv)) pendingSources.push(s)
+  flushPendingSources()
 
   // A steady tick is simpler and cheaper than event-storming the renderer:
   // speeds and progress change continuously anyway.

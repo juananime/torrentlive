@@ -14,6 +14,10 @@ contextBridge.exposeInMainWorld('wt', {
     try { return webUtils.getPathForFile(file) } catch { return null }
   },
 
+  /** Whether this app currently handles magnet: links. */
+  defaults: () => ipcRenderer.invoke('app:defaults'),
+  setDefaults: () => ipcRenderer.invoke('app:setDefaults'),
+
   /** Tells main which torrent is selected, so only its files are serialised. */
   focus: infoHash => ipcRenderer.invoke('ui:focus', infoHash),
 

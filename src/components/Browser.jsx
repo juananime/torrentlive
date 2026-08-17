@@ -1,5 +1,44 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { bytes } from '../lib/format.js'
+
+/**
+ * Magnet-link handler status.
+ *
+ * The magnet: scheme can be claimed programmatically. The .torrent file
+ * association cannot be forced on macOS — LaunchServices only lets the user
+ * decide that — so the hint explains the one manual step instead of pretending
+ * a button can do it.
+ */
+function DefaultHandler () {
+  const [state, setState] = useState(null)
+
+  const refresh = () => window.wt.defaults().then(setState).catch(() => {})
+  useEffect(() => { refresh() }, [])
+
+  if (!state) return null
+
+  return (
+    <div className="defaults">
+      <span className="label">Default Handler</span>
+      <div className="defaults-row">
+        <i className={`dot${state.magnet ? ' on' : ''}`} />
+        <span>magnet: links</span>
+        {state.magnet
+          ? <b>active</b>
+          : <button
+              className="btn"
+              onClick={() => window.wt.setDefaults().then(refresh)}
+            >Set</button>}
+      </div>
+      {state.torrentNeedsManualStep && (
+        <p className="hint">
+          For <code>.torrent</code> files: right-click one in Finder →
+          Get Info → Open with → Torrent Live → Change All.
+        </p>
+      )}
+    </div>
+  )
+}
 
 const FILTERS = [
   { id: 'all',        label: 'All Torrents', swatch: 'var(--text-dim)' },
@@ -54,6 +93,7 @@ export default function Browser ({ filter, onFilter, counts, info, onDrop, onCho
         <span className="label">Save To</span>
         <div className="pathline">{info?.downloadPath || '…'}</div>
         <button className="btn" onClick={onChooseFolder}>Change folder…</button>
+        <DefaultHandler />
       </div>
     </nav>
   )

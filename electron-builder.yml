@@ -28,6 +28,26 @@ asar: true
 asarUnpack:
   - '**/*.node'
 
+# Becoming the system handler takes two separate declarations: one for
+# .torrent documents, one for the magnet: URL scheme. Both are cross-platform
+# here — electron-builder writes CFBundleDocumentTypes / CFBundleURLTypes into
+# Info.plist on macOS, and the equivalent registry entries from the NSIS
+# installer on Windows.
+fileAssociations:
+  - ext: torrent
+    name: BitTorrent Document
+    description: BitTorrent metadata file
+    mimeType: application/x-bittorrent
+    role: Editor
+    # Owner asks LaunchServices to treat this app as the type's primary
+    # handler rather than one of several alternates.
+    rank: Owner
+
+protocols:
+  - name: Magnet URI
+    schemes:
+      - magnet
+
 mac:
   # Ship no x86_64 code at all. These prebuilds are inert on an arm64 app (the
   # loader picks darwin-arm64), but excluding them means the bundle cannot
@@ -58,6 +78,20 @@ mac:
     NSLocalNetworkUsageDescription: >-
       Torrent Live connects to peers on your local network to download and
       share torrents.
+    # The app is hardened but NOT sandboxed, so macOS (TCC) prompts the first
+    # time it writes into a protected folder. Downloads is the default save
+    # location, so that prompt is expected once on first download; without
+    # these strings the system shows a generic, alarming message. Folders the
+    # user picks in the open panel are granted implicitly and prompt again.
+    NSDownloadsFolderUsageDescription: >-
+      Torrent Live saves completed downloads to your Downloads folder.
+    NSDocumentsFolderUsageDescription: >-
+      Torrent Live saves downloads here if you choose this folder.
+    NSDesktopFolderUsageDescription: >-
+      Torrent Live saves downloads here if you choose this folder.
+    NSRemovableVolumesUsageDescription: >-
+      Torrent Live saves downloads here if you choose a folder on an external
+      drive.
 
 dmg:
   contents:
