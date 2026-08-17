@@ -1,28 +1,33 @@
 # Torrent Live
 
-A WebTorrent desktop client for macOS with an interface modelled on **Ableton Live**.
-Built to run **natively on Apple Silicon with no Rosetta and no compile step**.
+A WebTorrent desktop client for macOS with a dense, flat interface borrowed from
+music production software. Built to run **natively on Apple Silicon with no
+Rosetta and no compile step**.
 
 ---
 
-## Why the Ableton layout works here
+## The interface
 
-Live's session view is a dense grid of coloured clips with level meters, a browser
-down the left, and a detail panel across the bottom. That maps onto a torrent
-client almost one-for-one:
+Audio workstations solve a problem torrent clients share: showing many parallel
+streams of live, continuously changing numbers without the display turning into
+noise. The layout follows that convention — a status browser down the left, a
+dense grid of rows in the middle, and a detail panel across the bottom.
 
-| Ableton Live | Torrent Live |
+| Region | Contents |
 | --- | --- |
-| Control bar (tempo, transport, CPU meter) | Magnet input, global ↓/↑ read-outs, peers, ratio |
-| Browser sidebar (Sounds, Drums, Packs) | Status filters — All / Downloading / Seeding / Paused |
-| Session view tracks + clips | One row per torrent, each with its own clip colour |
-| Level meters | Progress bars, green → blue when seeding |
-| Detail view (clip / device panel) | File list of the selected torrent + streaming player |
+| Control bar | Magnet input, global ↓/↑ read-outs, peers, ratio |
+| Browser sidebar | Status filters — All / Downloading / Seeding / Paused |
+| Session grid | One row per torrent, each with its own colour stripe |
+| Level meters | Progress bars, green while downloading, blue when seeding |
+| Detail panel | File list of the selected torrent + streaming player |
 
-Styling rules taken directly from Live: completely flat (no gradients, no
-shadows, no rounded corners), panels divided by near-black 1px gaps, monochrome
-charcoal chrome, saturated colour reserved for data, and selection drawn as a
-solid **yellow fill with black text**.
+The styling rules, applied consistently:
+
+1. Completely flat — no gradients, no shadows, no rounded corners.
+2. Panels are divided by near-black 1px gaps rather than whitespace.
+3. Chrome stays monochrome charcoal; saturated colour is reserved for data.
+4. Selection is a solid **yellow fill with black text**, used sparingly.
+5. Type is small, tight, and uppercase for anything that is a label.
 
 ---
 
