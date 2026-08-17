@@ -4,5 +4,3 @@ release/
 *.log
 .DS_Store
 .vite/
-release/
-build/icon.png
