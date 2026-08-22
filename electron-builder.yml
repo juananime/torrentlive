@@ -1,5 +1,5 @@
 appId: com.jjm.webtorrent-live
-productName: WebTorrent Live
+productName: Torrent Live
 copyright: MIT
 
 directories:
@@ -27,6 +27,9 @@ buildDependenciesFromSource: false
 asar: true
 asarUnpack:
   - '**/*.node'
+  # ffmpeg is spawned as a child process, and a binary inside app.asar cannot
+  # be executed. remux.js rewrites the path to this unpacked copy.
+  - '**/node_modules/ffmpeg-static/**'
 
 mac:
   category: public.app-category.utilities
@@ -44,7 +47,7 @@ mac:
   extendInfo:
     # BitTorrent needs to accept inbound peer connections.
     NSLocalNetworkUsageDescription: >-
-      WebTorrent Live connects to peers on your local network to download and
+      Torrent Live connects to peers on your local network to download and
       share torrents.
 
 dmg:

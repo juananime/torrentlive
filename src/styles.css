@@ -1,5 +1,5 @@
 /* ==========================================================================
-   WebTorrent Live — an Ableton Live inspired interface
+   Torrent Live — an Ableton Live inspired interface
    --------------------------------------------------------------------------
    Design rules borrowed from Live, applied consistently:
      1. Absolutely flat. No gradients, no shadows, no rounded corners.
@@ -284,6 +284,25 @@ body {
   word-break: break-all;
   line-height: 1.4;
 }
+.pathline.warn { color: var(--meter-mid); }
+
+/* Video-server read-out: red dot for loopback-only, green once on the LAN. */
+.serverline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--text-faint);
+}
+.serverline .dot { width: 6px; height: 6px; flex: none; background: var(--text-faint); }
+.serverline.live { color: var(--meter-lo); }
+.serverline.live .dot { background: var(--meter-lo); }
+
+/* Subtitle finder credentials — a small stacked form in the sidebar foot. */
+.subcfg { display: grid; gap: 4px; }
+.subcfg .input { width: 100%; }
+.subcfg-row { display: flex; gap: 4px; }
+.subcfg-row .btn { flex: 1; justify-content: center; }
 
 /* ---- Session view (torrent list) ---------------------------------------- */
 
@@ -436,7 +455,8 @@ body {
 
 .frow {
   display: grid;
-  grid-template-columns: 1fr 88px 68px 76px;
+  /* the 20px column is the copy-link button; empty for non-streamable files */
+  grid-template-columns: 1fr 88px 20px 68px 76px;
   align-items: center;
   height: 22px;
   border-bottom: 1px solid var(--line);
@@ -480,6 +500,19 @@ body {
 .player-stage img { max-width: 100%; max-height: 100%; display: block; }
 .player-stage audio { width: 92%; }
 .player-idle { color: var(--text-faint); font-size: 10px; text-align: center; padding: 20px; line-height: 1.7; }
+/* Subtitle bar under the player: source picker, language, and the finder. */
+.player-subs {
+  display: grid;
+  grid-template-columns: auto 1fr 96px auto;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--line);
+}
+.player-subs .input { height: 18px; font-size: 10px; padding: 0 4px; }
+.player-subs .label { font-size: 8px; }
+
 .player-foot {
   flex: none;
   height: 22px;
