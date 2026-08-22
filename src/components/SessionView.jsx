@@ -1,4 +1,5 @@
 import { bytes, speed, pct, eta, clipColor } from '../lib/format.js'
+import { revealLabel } from '../lib/platform.js'
 
 function Meter ({ t }) {
   const cls = t.paused ? 'paused' : t.done ? 'done' : ''
@@ -58,7 +59,7 @@ export default function SessionView ({ torrents, selected, onSelect, onPause, on
               {t.paused
                 ? <button className="btn icon" title="Resume" onClick={() => onResume(t.infoHash)}>▶</button>
                 : <button className="btn icon" title="Pause" onClick={() => onPause(t.infoHash)}>❚❚</button>}
-              <button className="btn icon" title="Show in Finder" onClick={() => onReveal(t.infoHash)}>◎</button>
+              <button className="btn icon" title={revealLabel()} onClick={() => onReveal(t.infoHash)}>◎</button>
               <button className="btn icon danger" title="Remove" onClick={() => onRemove(t)}>✕</button>
             </div>
           </div>

@@ -728,9 +728,12 @@ function createWindow () {
     minHeight: 600,
     show: false,
     backgroundColor: '#121212',
-    // Ableton-style chrome: the traffic lights float over our own control bar.
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 14, y: 14 },
+    // Ableton-style chrome: on macOS the traffic lights float over our own
+    // control bar. Other platforms draw their own title bar above it, so the
+    // inset would just be a dead gap — see the platform rule in styles.css.
+    ...(process.platform === 'darwin'
+      ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 14, y: 14 } }
+      : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -855,6 +858,7 @@ function registerIpc () {
       chrome: process.versions.chrome
     },
     arch: process.arch,
+    platform: process.platform,
     // The whole point of the project: prove at runtime we are not translated.
     rosetta: isTranslated(),
     downloadPath,
@@ -1016,7 +1020,11 @@ function isTranslated () {
 // ---------------------------------------------------------------------------
 
 app.whenReady().then(async () => {
-  const saved = settings.init(app.getPath('userData'))
+  const saved = settings.init(app.getPath('userData'), [
+    // The package was called webtorrent-live before the rename, which is where
+    // a development install's settings still are.
+    path.join(path.dirname(app.getPath('userData')), 'webtorrent-live')
+  ])
   if (saved.downloadPath) downloadPath = saved.downloadPath
 
   ;({ default: WebTorrent } = await import('webtorrent'))

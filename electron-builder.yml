@@ -11,6 +11,12 @@ files:
   - electron/**
   - package.json
   - '!**/*.map'
+  # ffmpeg-static's binary is whatever the build machine installed, so it is
+  # excluded and the correct one for each target is copied in from
+  # build/ffmpeg/ by extraResources instead. Without this a Windows installer
+  # built on a Mac would ship a Mach-O executable and silently lose remuxing,
+  # HLS and embedded-subtitle extraction. scripts/fetch-ffmpeg.mjs stages them.
+  - '!**/node_modules/ffmpeg-static/ffmpeg*'
 
 # The Rosetta guarantee lives here.
 #
@@ -27,11 +33,15 @@ buildDependenciesFromSource: false
 asar: true
 asarUnpack:
   - '**/*.node'
-  # ffmpeg is spawned as a child process, and a binary inside app.asar cannot
-  # be executed. remux.js rewrites the path to this unpacked copy.
-  - '**/node_modules/ffmpeg-static/**'
+
+# Installers are named to match what the download site links to.
+artifactName: Torrent-Live-${version}-${arch}.${ext}
 
 mac:
+  artifactName: Torrent-Live-${version}-${arch}.${ext}
+  extraResources:
+    - from: build/ffmpeg/darwin-arm64/ffmpeg
+      to: ffmpeg
   category: public.app-category.utilities
   # arm64 first: this is an Apple Silicon native app by design.
   target:
@@ -58,3 +68,55 @@ dmg:
       y: 220
       type: link
       path: /Applications
+
+win:
+  artifactName: Torrent-Live-${version}-setup.${ext}
+  # ffmpeg-static publishes no win32-arm64 build, so both payloads carry the
+  # x64 binary. Windows on ARM runs it under x64 emulation — the app itself is
+  # still native, and only the remux/subtitle child process is translated.
+  extraResources:
+    - from: build/ffmpeg/win32-x64/ffmpeg.exe
+      to: ffmpeg.exe
+  # 0.1.0 shipped both payloads so Snapdragon and Surface machines run the app
+  # natively; dropping arm64 here would be a regression.
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: Torrent-Live-${version}-setup.${ext}
+
+linux:
+  artifactName: Torrent-Live-${version}-${arch}.${ext}
+  # Debian requires a maintainer address and it ends up visible in the
+  # installed package, so this is GitHub's noreply alias rather than a real
+  # inbox. Change it if you would rather be reachable.
+  maintainer: juananime <juananime@users.noreply.github.com>
+  # Without this the Debian package name and the on-disk binary both come from
+  # package.json's "name", which is still the pre-rename webtorrent-live —
+  # visible in `apt` and `dpkg -l`.
+  executableName: torrent-live
+  extraResources:
+    - from: build/ffmpeg/linux-x64/ffmpeg
+      to: ffmpeg
+  category: AudioVideo
+  synopsis: Stream torrents as they download, and serve them to your network
+  description: >-
+    A torrent client that plays video and audio while they are still
+    downloading, and doubles as a video server for other devices on your
+    local network.
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+
+deb:
+  # ffmpeg is bundled, so the package depends on nothing beyond the usual
+  # desktop libraries electron-builder already declares.
+  packageCategory: net
+  priority: optional
+  artifactName: Torrent-Live-${version}-${arch}.${ext}

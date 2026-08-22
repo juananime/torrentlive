@@ -17,15 +17,25 @@ const DEFAULTS = {
 let file = null
 let cache = { ...DEFAULTS }
 
-export function init (userDataDir) {
+/**
+ * `legacyDirs` are userData directories the app used under previous names.
+ * Electron derives that path from the package name, so renaming the product
+ * silently moves it — and a saved API key would look like it had vanished.
+ */
+export function init (userDataDir, legacyDirs = []) {
   file = path.join(userDataDir, 'settings.json')
+  const source = [file, ...legacyDirs.map(d => path.join(d, 'settings.json'))]
+    .find(f => { try { return fs.existsSync(f) } catch { return false } }) || file
   try {
-    const raw = JSON.parse(fs.readFileSync(file, 'utf8'))
+    const raw = JSON.parse(fs.readFileSync(source, 'utf8'))
     cache = {
       ...DEFAULTS,
       ...raw,
       openSubtitles: { ...DEFAULTS.openSubtitles, ...(raw.openSubtitles || {}) }
     }
+    // Adopted from an older location: write it forward so this is the last
+    // time we go looking.
+    if (source !== file) patch({})
   } catch {
     // Absent or corrupt: defaults are correct and the next save rewrites it.
   }

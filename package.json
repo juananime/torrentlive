@@ -1,7 +1,7 @@
 {
-  "name": "webtorrent-live",
-  "version": "0.1.0",
-  "description": "A WebTorrent desktop client with an Ableton Live inspired interface. Native Apple Silicon, no Rosetta required.",
+  "name": "torrent-live",
+  "version": "0.2.0",
+  "description": "A torrent client that streams video while it downloads, and serves it to your local network. Native Apple Silicon, no Rosetta required.",
   "private": true,
   "type": "module",
   "main": "electron/main.js",
@@ -11,11 +11,16 @@
     "dev": "node scripts/dev.mjs",
     "build": "vite build",
     "start": "npm run build && electron .",
-    "dist": "npm run build && electron-builder --mac --arm64",
+    "dist": "npm run ffmpeg:mac && npm run build && electron-builder --mac --arm64",
     "dist:universal": "npm run build && electron-builder --mac --universal",
     "check:native": "node scripts/check-native.mjs",
     "test:webui": "node scripts/test-webui.mjs",
-    "smoke": "npm run build && WTLIVE_SMOKE=1 electron ."
+    "smoke": "npm run build && WTLIVE_SMOKE=1 electron .",
+    "ffmpeg:mac": "node scripts/fetch-ffmpeg.mjs darwin arm64",
+    "ffmpeg:win": "node scripts/fetch-ffmpeg.mjs win32 x64",
+    "dist:win": "npm run ffmpeg:win && npm run build && electron-builder --win --x64",
+    "ffmpeg:linux": "node scripts/fetch-ffmpeg.mjs linux x64",
+    "dist:linux": "npm run ffmpeg:linux && npm run build && electron-builder --linux --x64"
   },
   "dependencies": {
     "ffmpeg-static": "^5.3.0",

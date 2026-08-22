@@ -13,13 +13,31 @@
 // ---------------------------------------------------------------------------
 
 import { spawn } from 'node:child_process'
+import fs from 'node:fs'
+import path from 'node:path'
 import ffmpegStatic from 'ffmpeg-static'
 
 /**
- * Inside a packaged app the binary lives in app.asar, where it cannot be
- * executed. electron-builder unpacks it next door; point at that copy.
+ * Where ffmpeg is, in both worlds.
+ *
+ * Packaged: build/ffmpeg/<platform>-<arch>/ was copied into the app's
+ * resources by electron-builder, which is the only way a cross-built
+ * installer gets a binary for the machine it will actually run on —
+ * ffmpeg-static resolves against whoever ran `npm install`.
+ *
+ * Development: ffmpeg-static's own binary, which is correct by definition
+ * because this machine installed it.
  */
-export const FFMPEG = String(ffmpegStatic || '').replace(/app\.asar(?![\w.])/, 'app.asar.unpacked')
+function resolveFfmpeg () {
+  const exe = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
+  if (process.resourcesPath) {
+    const packaged = path.join(process.resourcesPath, exe)
+    if (fs.existsSync(packaged)) return packaged
+  }
+  return String(ffmpegStatic || '').replace(/app\.asar(?![\w.])/, 'app.asar.unpacked')
+}
+
+export const FFMPEG = resolveFfmpeg()
 
 /** Codecs a browser will play if we hand them over untouched. */
 const VIDEO_COPY_OK = /^(h264|vp8|vp9|av1)$/

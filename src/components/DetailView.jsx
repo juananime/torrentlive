@@ -1,5 +1,6 @@
 import { bytes, pct, kindOf } from '../lib/format.js'
 import Player from './Player.jsx'
+import { revealLabel } from '../lib/platform.js'
 
 /**
  * Live's bottom detail view: everything about the currently selected item.
@@ -34,7 +35,7 @@ export default function DetailView ({
         )}
         <span className="spacer" />
         {torrent && (
-          <button className="btn" onClick={() => onReveal(torrent.infoHash)}>Show in Finder</button>
+          <button className="btn" onClick={() => onReveal(torrent.infoHash)}>{revealLabel()}</button>
         )}
         <button className="btn icon" title="Collapse" onClick={onToggle}>▾</button>
       </div>

@@ -3,6 +3,7 @@ import ControlBar from './components/ControlBar.jsx'
 import Browser from './components/Browser.jsx'
 import SessionView from './components/SessionView.jsx'
 import DetailView from './components/DetailView.jsx'
+import { setPlatform } from './lib/platform.js'
 
 const EMPTY_TOTALS = { downloadSpeed: 0, uploadSpeed: 0, peers: 0, ratio: 0, torrents: 0, progress: 0 }
 const EMPTY_SERVER = { port: 0, lan: false, addresses: [], host: '127.0.0.1' }
@@ -25,7 +26,12 @@ export default function App () {
   }, [])
 
   useEffect(() => {
-    window.wt.info().then(setInfo).catch(() => {})
+    window.wt.info().then(i => {
+      setInfo(i)
+      // Drives the platform-specific rules in styles.css and the labels.
+      document.documentElement.dataset.platform = i.platform || 'darwin'
+      setPlatform(i.platform)
+    }).catch(() => {})
 
     const offState = window.wt.onState(({ torrents, totals, server }) => {
       setTorrents(torrents)

@@ -161,6 +161,10 @@ body {
   border-bottom: 1px solid var(--line);
 }
 .controlbar > * { -webkit-app-region: no-drag; }
+/* Windows and Linux draw their own title bar above ours, so the inset that
+   clears the macOS traffic lights would just be an empty gap. */
+:root[data-platform="win32"] .controlbar,
+:root[data-platform="linux"] .controlbar { padding-left: 12px; }
 
 .brand {
   display: flex;

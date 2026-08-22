@@ -1,4 +1,4 @@
-# WebTorrent Live
+# Torrent Live
 
 A WebTorrent desktop client for macOS with an interface modelled on **Ableton Live**.
 Built to run **natively on Apple Silicon with no Rosetta and no compile step**.
@@ -11,7 +11,7 @@ Live's session view is a dense grid of coloured clips with level meters, a brows
 down the left, and a detail panel across the bottom. That maps onto a torrent
 client almost one-for-one:
 
-| Ableton Live | WebTorrent Live |
+| Ableton Live | Torrent Live |
 | --- | --- |
 | Control bar (tempo, transport, CPU meter) | Magnet input, global ↓/↑ read-outs, peers, ratio |
 | Browser sidebar (Sounds, Drums, Packs) | Status filters — All / Downloading / Seeding / Paused |
