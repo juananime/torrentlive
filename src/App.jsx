@@ -3,12 +3,15 @@ import ControlBar from './components/ControlBar.jsx'
 import Browser from './components/Browser.jsx'
 import SessionView from './components/SessionView.jsx'
 import DetailView from './components/DetailView.jsx'
+import { setPlatform } from './lib/platform.js'
 
 const EMPTY_TOTALS = { downloadSpeed: 0, uploadSpeed: 0, peers: 0, ratio: 0, torrents: 0, progress: 0 }
+const EMPTY_SERVER = { port: 0, lan: false, addresses: [], host: '127.0.0.1' }
 
 export default function App () {
   const [torrents, setTorrents] = useState([])
   const [totals, setTotals] = useState(EMPTY_TOTALS)
+  const [server, setServer] = useState(EMPTY_SERVER)
   const [info, setInfo] = useState(null)
   const [filter, setFilter] = useState('all')
   const [selected, setSelected] = useState(null)
@@ -23,11 +26,17 @@ export default function App () {
   }, [])
 
   useEffect(() => {
-    window.wt.info().then(setInfo).catch(() => {})
+    window.wt.info().then(i => {
+      setInfo(i)
+      // Drives the platform-specific rules in styles.css and the labels.
+      document.documentElement.dataset.platform = i.platform || 'darwin'
+      setPlatform(i.platform)
+    }).catch(() => {})
 
-    const offState = window.wt.onState(({ torrents, totals }) => {
+    const offState = window.wt.onState(({ torrents, totals, server }) => {
       setTorrents(torrents)
       setTotals(totals)
+      if (server) setServer(server)
     })
     const offError = window.wt.onError(({ message }) => toast(message))
 
@@ -96,6 +105,30 @@ export default function App () {
     setInfo(i => (i ? { ...i, downloadPath: next.downloadPath } : i))
   }, [])
 
+  const toggleLan = useCallback(async next => {
+    try {
+      const s = await window.wt.setLanSharing(next)
+      setServer(s)
+      toast(next
+        ? `Open on http://${s.host}:${s.port} — anyone on this network can watch`
+        : 'LAN sharing off — streams are loopback-only again')
+    } catch (e) { toast(e.message) }
+  }, [toast])
+
+  const copyWebLink = useCallback(async () => {
+    try {
+      const url = await window.wt.copyWebLink()
+      toast(`Copied ${url}`)
+    } catch (e) { toast(e.message) }
+  }, [toast])
+
+  const copyLink = useCallback(async (infoHash, fileIndex) => {
+    try {
+      const url = await window.wt.copyLink(infoHash, fileIndex)
+      toast(`Copied ${url}`)
+    } catch (e) { toast(e.message) }
+  }, [toast])
+
   return (
     <div className="app">
       <ControlBar
@@ -111,8 +144,12 @@ export default function App () {
           onFilter={setFilter}
           counts={counts}
           info={info}
+          server={server}
           onDrop={onDrop}
           onChooseFolder={chooseFolder}
+          onToggleLan={toggleLan}
+          onToast={toast}
+          onCopyWebLink={copyWebLink}
         />
         <SessionView
           torrents={visible}
@@ -129,10 +166,13 @@ export default function App () {
         torrent={current}
         playing={livePlaying}
         collapsed={collapsed}
+        server={server}
         onToggle={() => setCollapsed(c => !c)}
         onPlay={(infoHash, file) => setPlaying({ infoHash, index: file.index })}
         onClosePlayer={() => setPlaying(null)}
         onReveal={(h, i) => window.wt.reveal(h, i)}
+        onCopyLink={copyLink}
+        onToast={toast}
       />
 
       {toasts.length > 0 && (

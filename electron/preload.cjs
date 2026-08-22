@@ -22,6 +22,16 @@ contextBridge.exposeInMainWorld('wt', {
   reveal: (infoHash, fileIndex) => ipcRenderer.invoke('torrent:reveal', { infoHash, fileIndex }),
   chooseFolder: () => ipcRenderer.invoke('settings:chooseFolder'),
 
+  /** Subtitle finder credentials. The key itself never comes back out. */
+  getSubtitleConfig: () => ipcRenderer.invoke('subtitles:getConfig'),
+  setSubtitleConfig: cfg => ipcRenderer.invoke('subtitles:setConfig', cfg),
+  testSubtitleConfig: () => ipcRenderer.invoke('subtitles:testConfig'),
+
+  /** LAN video server: rebind the stream server on/off the network. */
+  setLanSharing: enabled => ipcRenderer.invoke('server:setLan', enabled),
+  copyLink: (infoHash, fileIndex) => ipcRenderer.invoke('server:copyLink', { infoHash, fileIndex }),
+  copyWebLink: () => ipcRenderer.invoke('server:copyWebLink'),
+
   /** Subscribe to the 500ms state tick. Returns an unsubscribe function. */
   onState: cb => {
     const handler = (_e, payload) => cb(payload)

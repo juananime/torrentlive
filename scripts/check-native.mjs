@@ -90,9 +90,43 @@ if (risky.length) {
   process.exit(1)
 }
 
-console.log('RESULT: every macOS native addon in the tree provides an arm64 build.')
-console.log('        Nothing here forces Rosetta.\n')
+console.log('addons: every macOS native addon in the tree provides an arm64 build.\n')
 console.log('        Note: these addons are optional accelerators for WebTorrent')
 console.log('        (µTP transport, faster WebSocket masking, WebRTC in Node).')
 console.log('        The app runs correctly without them — electron-builder is')
 console.log('        configured with npmRebuild:false so none are ever compiled.\n')
+
+// ---------------------------------------------------------------------------
+// Bundled executables
+//
+// Addons are not the only way an x86_64 binary gets in. A package can ship a
+// plain command-line executable and it will happily run under Rosetta without
+// anything failing loudly — ffprobe-static, for one, puts an x86_64 build
+// inside its darwin/arm64 directory. Anything we actually spawn gets checked.
+// ---------------------------------------------------------------------------
+
+const SPAWNED = [
+  ['ffmpeg-static', join(modules, 'ffmpeg-static', 'ffmpeg')]
+]
+
+const present = SPAWNED.filter(([, p]) => existsSync(p))
+
+if (present.length) {
+  console.log('bundled executables the app spawns:\n')
+  const bad = []
+  for (const [pkg, p] of present) {
+    const info = archOf(p)
+    const arm = /arm64/.test(info)
+    if (!arm) bad.push([pkg, info])
+    console.log(`  ${arm ? '✓' : '✗'} ${pkg.padEnd(22)} ${info.replace('Mach-O 64-bit executable ', '')}`)
+  }
+  console.log('')
+  if (bad.length) {
+    console.log('RESULT: a bundled executable is not arm64 and would run under Rosetta:\n')
+    for (const [pkg, info] of bad) console.log(`          ${pkg} — ${info}`)
+    console.log('')
+    process.exit(1)
+  }
+}
+
+console.log('RESULT: nothing in the tree forces Rosetta.\n')

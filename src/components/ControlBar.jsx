@@ -21,7 +21,7 @@ export default function ControlBar ({ totals, info, onAdd, onAddFile }) {
   return (
     <header className="controlbar">
       <div className="brand">
-        <b>WebTorrent</b>
+        <b>Torrent</b>
         <span>Live</span>
       </div>
 
